@@ -52,6 +52,7 @@ const CONFIG = {
         "\uD83C\uDDEC\uD83C\uDDF7": "Greece",
         "\uD83C\uDDEC\uD83C\uDDF9": "Guatemala",
         "\uD83C\uDDED\uD83C\uDDF0": "Hong Kong",
+        "\uD83C\uDDF9\uD83C\uDDFC": "Taiwan",
         "\uD83C\uDDED\uD83C\uDDF7": "Croatia",
         "\uD83C\uDDED\uD83C\uDDFA": "Hungary",
         "\uD83C\uDDEE\uD83C\uDDE9": "Indonesia",
