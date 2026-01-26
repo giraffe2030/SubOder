@@ -172,9 +172,18 @@ async function operator(proxies = [], targetPlatform, context) {
         // If Adapter ran previously and saved info to the subscription
         if (!subTraffic && sub.subUserinfo) {
             successLog(`[Strategy C] Found persisted info for ${sub.name}: ${sub.subUserinfo}`);
-            const parsed = parseFlowHeaders(normalizeFlowHeader({ 'subscription-userinfo': sub.subUserinfo }, true)['subscription-userinfo']);
-            if (parsed && parsed.total > 0) {
-                subTraffic = parsed;
+            try {
+                // sub.subUserinfo is already in format: "upload=X; download=Y; total=Z; expire=T"
+                // Pass it directly to parseFlowHeaders
+                const parsed = parseFlowHeaders(sub.subUserinfo);
+                if (parsed && parsed.total > 0) {
+                    subTraffic = parsed;
+                    successLog(`[Strategy C] Parsed successfully for ${sub.name}: total=${parsed.total}`);
+                } else {
+                    warnLog(`[Strategy C] Parse returned invalid data for ${sub.name}`);
+                }
+            } catch (e) {
+                errLog(`[Strategy C] Parse error for ${sub.name}: ${e.message}`);
             }
         }
 
