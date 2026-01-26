@@ -12,12 +12,15 @@
  */
 
 async function operator(proxies = [], targetPlatform, context) {
-    const LOG_PREFIX = '[Traffic Adapter]';
+    const LOG_PREFIX = '[Traffic Adapter v2.1]';
 
     // Logging helper
     const log = (msg) => console.log(`${LOG_PREFIX} ${msg}`);
 
     log(`Starting execution. Node count: ${proxies.length}`);
+    try {
+        log(`Context Source Keys: ${JSON.stringify(Object.keys(context.source))}`);
+    } catch (e) { }
 
     // State
     let state = {
@@ -99,6 +102,43 @@ async function operator(proxies = [], targetPlatform, context) {
 
     const subUserInfo = parts.join('; ');
     log(`Result: ${subUserInfo}`);
+
+    // --- Persistence (Write to DB) ---
+    // This allows Aggregator to read the info later via Strategy C
+    try {
+        const SUBS_KEY = 'subs';
+        const $ = $substore;
+        const allSubs = $.read(SUBS_KEY) || [];
+
+        // Context source usually contains the sub name or metadata
+        // Log showed keys: "NXO", "_collection" -> So the sub name IS the key.
+        const sourceKeys = Object.keys(context.source).filter(k => k !== '_collection');
+        const subName = sourceKeys.length > 0 ? sourceKeys[0] : context.source.name;
+
+        log(`[Persistence] Context Name: "${subName}"`);
+
+        if (subName) {
+            const subIdx = allSubs.findIndex(s => s.name === subName);
+            log(`[Persistence] Search result index: ${subIdx}`);
+
+            if (subIdx !== -1) {
+                // Check if update is needed to avoid unnecessary IO
+                if (allSubs[subIdx].subUserinfo !== subUserInfo) {
+                    allSubs[subIdx].subUserinfo = subUserInfo;
+                    $.write(allSubs, SUBS_KEY);
+                    log(`Persisted subUserinfo to DB for ${subName}`);
+                } else {
+                    log(`DB already up-to-date for ${subName}`);
+                }
+            } else {
+                log(`Could not find sub "${subName}" in DB to persist info.`);
+            }
+        } else {
+            log(`[Persistence] context.source.name is missing! Source keys: ${Object.keys(context.source).join(',')}`);
+        }
+    } catch (e) {
+        log(`Persistence failed: ${e.message}`);
+    }
 
     // --- Output (Header Injection) ---
     // This allows subsequent scripts (like sum.js) to read this data as if it came from the provider.
