@@ -178,6 +178,7 @@ async function operator(proxies = [], targetPlatform, context) {
 
         // 4. Aggregate
         if (subTraffic) {
+            successLog(`[Aggregation] Adding stats from ${sub.name}: ${JSON.stringify(subTraffic)}`);
             if (subTraffic.usage?.upload) stats.upload += subTraffic.usage.upload;
             if (subTraffic.usage?.download) stats.download += subTraffic.usage.download;
             if (subTraffic.total) stats.total += subTraffic.total;
