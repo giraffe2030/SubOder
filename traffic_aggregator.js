@@ -201,6 +201,11 @@ async function operator(proxies = [], targetPlatform, context) {
 
     log(`Final Aggregation: ${subUserInfo}`);
 
+    // Set Response Header (Modern) - Do this EARLY
+    if (typeof $options !== 'undefined') {
+        $options._res = { headers: { 'subscription-userinfo': subUserInfo } };
+    }
+
     // Write to Storage (Legacy/Persistence)
     const allCols = $.read(COLLECTIONS_KEY) || [];
     const colIdx = allCols.findIndex(c => c.name === collection.name);
@@ -214,11 +219,6 @@ async function operator(proxies = [], targetPlatform, context) {
         log("Persisting updated sub headers to DB...");
         $.write(allSubs, SUBS_KEY);
         successLog("DB persistence complete.");
-    }
-
-    // Set Response Header (Modern)
-    if (typeof $options !== 'undefined') {
-        $options._res = { headers: { 'subscription-userinfo': subUserInfo } };
     }
 
     return proxies;
