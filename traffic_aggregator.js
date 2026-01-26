@@ -32,9 +32,16 @@ async function operator(proxies = [], targetPlatform, context) {
     const allSubs = $.read(SUBS_KEY) || [];
     let stats = { upload: 0, download: 0, total: 0, expire: 0 };
 
-    // Helpers from Sub-Store or polyfill
-    const flowUtils = this.flowUtils || {};
-    const { getFlowHeaders, parseFlowHeaders, normalizeFlowHeader } = flowUtils;
+    // Helpers from Sub-Store environment
+    // Try to access global flowUtils directly
+    let fUtils;
+    try {
+        fUtils = flowUtils;
+    } catch (e) {
+        fUtils = {};
+        errLog("flowUtils is not defined in this scope!");
+    }
+    const { getFlowHeaders, parseFlowHeaders, normalizeFlowHeader } = fUtils;
 
     // --- Strategy B: Node Name Parser (Fallback) ---
     const extractFromNodes = (nodeList) => {
@@ -73,10 +80,19 @@ async function operator(proxies = [], targetPlatform, context) {
         });
     }
 
+    // Debug Environment
+    log(`Environment Check: source=${collection.source}, getFlowHeaders=${typeof getFlowHeaders}`);
+    if (proxies.length > 0) {
+        log(`Sample Proxy: ${JSON.stringify(proxies[0], null, 2)}`);
+    } else {
+        warnLog("No proxies available in this collection!");
+    }
+
     for await (const sub of allSubs) {
         if (!subnames.has(sub.name)) continue;
 
         let subTraffic = null;
+        log(`Processing Sub: ${sub.name}, Source: ${sub.source}, URL: ${sub.url?.substring(0, 30)}...`);
 
         // 1. Try Remote Headers (Strategy A)
         if (sub.source !== 'local' && getFlowHeaders) {
@@ -109,7 +125,12 @@ async function operator(proxies = [], targetPlatform, context) {
                 // Sub-Store typically adds `_subName` property to proxies in a collection.
 
                 const subProxies = proxies.filter(p => p._subName === sub.name);
+                log(`[Strategy B] Filtering for subName="${sub.name}". Found ${subProxies.length} proxies.`);
+
                 if (subProxies.length > 0) {
+                    // Peek at first proxy name to see if it matches regex expectations
+                    log(`[Strategy B] First proxy name: "${subProxies[0].name}"`);
+
                     const extracted = extractFromNodes(subProxies);
                     if (extracted.t > 0) {
                         subTraffic = {
@@ -119,16 +140,27 @@ async function operator(proxies = [], targetPlatform, context) {
                         };
                         successLog(`[Strategy B] Extracted from nodes for ${sub.name}: ${JSON.stringify(subTraffic)}`);
                     } else {
-                        warnLog(`[Strategy B] No traffic info found in nodes for ${sub.name}`);
+                        warnLog(`[Strategy B] No traffic info found in nodes for ${sub.name}. (Regex failed?)`);
                     }
                 } else {
-                    warnLog(`[Strategy B] No proxies found in context for ${sub.name}`);
+                    warnLog(`[Strategy B] No proxies found in context for ${sub.name}. Check if proxies have _subName field.`);
                 }
             } catch (e) {
                 errLog(`[Strategy B] Failed for ${sub.name}: ${e}`);
             }
         }
-        // 3. Aggregate
+
+        // 3. Try Strategy C: Local Persistence (DB)
+        // If Adapter ran previously and saved info to the subscription
+        if (!subTraffic && sub.subUserinfo) {
+            successLog(`[Strategy C] Found persisted info for ${sub.name}: ${sub.subUserinfo}`);
+            const parsed = parseFlowHeaders(normalizeFlowHeader({ 'subscription-userinfo': sub.subUserinfo }, true)['subscription-userinfo']);
+            if (parsed && parsed.total > 0) {
+                subTraffic = parsed;
+            }
+        }
+
+        // 4. Aggregate
         if (subTraffic) {
             if (subTraffic.usage?.upload) stats.upload += subTraffic.usage.upload;
             if (subTraffic.usage?.download) stats.download += subTraffic.usage.download;
