@@ -1,21 +1,11 @@
 /**
- * Sub-Store Script: Traffic Calculation
+ * Sub-Store Script: Traffic Calculation (单订阅专用)
  * 从节点名称中提取流量信息（Used, Total, Expire）
  * 兼容格式: "51.69 G | 200.00 G" 和 "Expire Date：2026/02/16"
- * 输出方式与 sum.js 一致：写入 Sub-Store 存储 + 设置响应头
  */
 
 async function operator(proxies = [], targetPlatform, context) {
-    const SUBS_KEY = 'subs'
-    const COLLECTIONS_KEY = 'collections'
-    const $ = $substore
-
     console.log('[traffic_calc] 脚本开始执行, 节点数量:', proxies.length)
-
-    const { source } = context
-    const { _collection: collection } = source
-
-    console.log('[traffic_calc] 组合订阅:', collection?.name || 'N/A')
 
     let uploadSum = 0
     let downloadSum = 0
@@ -64,19 +54,7 @@ async function operator(proxies = [], targetPlatform, context) {
 
     console.log('[traffic_calc] 计算结果:', subUserInfo)
 
-    // 写入 Sub-Store 存储（与 sum.js 一致）
-    if (collection) {
-        const allCols = $.read(COLLECTIONS_KEY) || []
-        for (let index = 0; index < allCols.length; index++) {
-            if (collection.name === allCols[index].name) {
-                allCols[index].subUserinfo = subUserInfo
-                break
-            }
-        }
-        $.write(allCols, COLLECTIONS_KEY)
-    }
-
-    // 设置响应头（与 sum.js 一致）
+    // 设置响应头
     if (typeof $options !== 'undefined') {
         $options._res = {
             headers: {
