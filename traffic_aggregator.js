@@ -105,6 +105,22 @@ async function operator(proxies = [], targetPlatform, context) {
                     if (parsed && parsed.total > 0) {
                         subTraffic = parsed;
                         successLog(`[Strategy A] Fetched headers for ${sub.name}: ${JSON.stringify(subTraffic)}`);
+
+                        // --- Persistence (Cache) ---
+                        try {
+                            const subIdx = allSubs.findIndex(s => s.name === sub.name);
+                            if (subIdx !== -1) {
+                                const headerStr = normalizeFlowHeader(headers, true)['subscription-userinfo'];
+                                // Only update if changed
+                                if (allSubs[subIdx].subUserinfo !== headerStr) {
+                                    allSubs[subIdx].subUserinfo = headerStr;
+                                    $.write(allSubs, SUBS_KEY);
+                                    successLog(`[Strategy A] Cached headers to DB for ${sub.name}`);
+                                }
+                            }
+                        } catch (e) {
+                            warnLog(`[Strategy A] Failed to cache headers: ${e.message}`);
+                        }
                     }
                 }
             } catch (e) {
