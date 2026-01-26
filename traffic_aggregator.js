@@ -88,6 +88,8 @@ async function operator(proxies = [], targetPlatform, context) {
         warnLog("No proxies available in this collection!");
     }
 
+    let dbModified = false;
+
     for await (const sub of allSubs) {
         if (!subnames.has(sub.name)) continue;
 
@@ -106,7 +108,7 @@ async function operator(proxies = [], targetPlatform, context) {
                         subTraffic = parsed;
                         successLog(`[Strategy A] Fetched headers for ${sub.name}: ${JSON.stringify(subTraffic)}`);
 
-                        // --- Persistence (Cache) ---
+                        // --- Persistence (Cache Logic In-Memory) ---
                         try {
                             const subIdx = allSubs.findIndex(s => s.name === sub.name);
                             if (subIdx !== -1) {
@@ -114,12 +116,12 @@ async function operator(proxies = [], targetPlatform, context) {
                                 // Only update if changed
                                 if (allSubs[subIdx].subUserinfo !== headerStr) {
                                     allSubs[subIdx].subUserinfo = headerStr;
-                                    $.write(allSubs, SUBS_KEY);
-                                    successLog(`[Strategy A] Cached headers to DB for ${sub.name}`);
+                                    dbModified = true;
+                                    successLog(`[Strategy A] Updated memory cache for ${sub.name}`);
                                 }
                             }
                         } catch (e) {
-                            warnLog(`[Strategy A] Failed to cache headers: ${e.message}`);
+                            warnLog(`[Strategy A] Failed to update memory cache: ${e.message}`);
                         }
                     }
                 }
@@ -205,6 +207,13 @@ async function operator(proxies = [], targetPlatform, context) {
     if (colIdx !== -1) {
         allCols[colIdx].subUserinfo = subUserInfo;
         $.write(allCols, COLLECTIONS_KEY);
+    }
+
+    // --- Finalize Persistence (For Strategy C Cache) ---
+    if (dbModified) {
+        log("Persisting updated sub headers to DB...");
+        $.write(allSubs, SUBS_KEY);
+        successLog("DB persistence complete.");
     }
 
     // Set Response Header (Modern)
