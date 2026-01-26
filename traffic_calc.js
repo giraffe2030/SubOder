@@ -10,8 +10,12 @@ async function operator(proxies = [], targetPlatform, context) {
     const COLLECTIONS_KEY = 'collections'
     const $ = $substore
 
+    console.log('[traffic_calc] 脚本开始执行, 节点数量:', proxies.length)
+
     const { source } = context
     const { _collection: collection } = source
+
+    console.log('[traffic_calc] 组合订阅:', collection?.name || 'N/A')
 
     let uploadSum = 0
     let downloadSum = 0
@@ -57,6 +61,8 @@ async function operator(proxies = [], targetPlatform, context) {
 
     // 构建 subscription-userinfo 字符串
     const subUserInfo = `upload=${Math.floor(uploadSum)}; download=${Math.floor(downloadSum)}; total=${Math.floor(totalSum)}${expire ? `; expire=${expire}` : ''}`
+
+    console.log('[traffic_calc] 计算结果:', subUserInfo)
 
     // 写入 Sub-Store 存储（与 sum.js 一致）
     if (collection) {
