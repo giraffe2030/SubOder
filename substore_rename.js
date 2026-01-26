@@ -51,6 +51,7 @@ const CONFIG = {
         "\uD83C\uDDEC\uD83C\uDDEA": "Georgia",
         "\uD83C\uDDEC\uD83C\uDDF7": "Greece",
         "\uD83C\uDDEC\uD83C\uDDF9": "Guatemala",
+        "\uD83C\uDDE8\uD83C\uDDF3": "Taiwan",      // <--- [NEW] CN 映射为 Taiwan
         "\uD83C\uDDED\uD83C\uDDF0": "Hong Kong",
         "\uD83C\uDDF9\uD83C\uDDFC": "Taiwan",
         "\uD83C\uDDED\uD83C\uDDF7": "Croatia",
