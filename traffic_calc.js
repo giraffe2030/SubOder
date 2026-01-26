@@ -1,65 +1,83 @@
 /**
  * Sub-Store Script: Traffic Calculation
- * Extracts key traffic information (Used, Total, Expire) from proxy node names.
- * Compatible with node names like: "51.69 G | 200.00 G" and "Expire Date：2026/02/16"
+ * 从节点名称中提取流量信息（Used, Total, Expire）
+ * 兼容格式: "51.69 G | 200.00 G" 和 "Expire Date：2026/02/16"
+ * 输出方式与 sum.js 一致：写入 Sub-Store 存储 + 设置响应头
  */
 
-function operator(proxies, targetPlatform) {
-    let used = 0;
-    let total = 0;
-    let expire = 0;
+async function operator(proxies = [], targetPlatform, context) {
+    const SUBS_KEY = 'subs'
+    const COLLECTIONS_KEY = 'collections'
+    const $ = $substore
 
-    // Regex patterns
-    // Matches: 51.69 G | 200.00 G (handles G/M, spaces)
-    const trafficRegex = /(\d+(?:\.\d+)?)\s*([GM])B?\s*\|\s*(\d+(?:\.\d+)?)\s*([GM])B?/i;
-    // Matches: Expire Date：2026/02/16 (handles chinese/english colon)
-    const dateRegex = /Expire Date[:：]\s*(\d{4}[\/\-]\d{2}[\/\-]\d{2})/;
+    const { source } = context
+    const { _collection: collection } = source
 
-    // Helper to convert to bytes
+    let uploadSum = 0
+    let downloadSum = 0
+    let totalSum = 0
+    let expire = 0
+
+    // 正则表达式
+    // 匹配: 51.69 G | 200.00 G (支持 G/M，空格)
+    const trafficRegex = /(\d+(?:\.\d+)?)\s*([GM])B?\s*\|\s*(\d+(?:\.\d+)?)\s*([GM])B?/i
+    // 匹配: Expire Date：2026/02/16 (支持中英文冒号)
+    const dateRegex = /Expire Date[:：]\s*(\d{4}[\/\-]\d{2}[\/\-]\d{2})/
+
+    // 单位转换为字节
     const toBytes = (num, unit) => {
-        const n = parseFloat(num);
-        const u = unit.toUpperCase();
-        if (u === 'G') return n * 1024 * 1024 * 1024;
-        if (u === 'M') return n * 1024 * 1024;
-        return n;
-    };
+        const n = parseFloat(num)
+        const u = unit.toUpperCase()
+        if (u === 'G') return n * 1024 * 1024 * 1024
+        if (u === 'M') return n * 1024 * 1024
+        return n
+    }
 
+    // 遍历节点提取信息
     proxies.forEach(p => {
-        const name = p.name || "";
+        const name = p.name || ""
 
-        // Extract Traffic
-        const trafficMatch = name.match(trafficRegex);
+        // 提取流量
+        const trafficMatch = name.match(trafficRegex)
         if (trafficMatch) {
-            used = toBytes(trafficMatch[1], trafficMatch[2]);
-            total = toBytes(trafficMatch[3], trafficMatch[4]);
+            downloadSum = toBytes(trafficMatch[1], trafficMatch[2])
+            totalSum = toBytes(trafficMatch[3], trafficMatch[4])
         }
 
-        // Extract Expiry
-        const dateMatch = name.match(dateRegex);
+        // 提取过期时间
+        const dateMatch = name.match(dateRegex)
         if (dateMatch) {
-            const dateStr = dateMatch[1].replace(/-/g, '/'); // standardizing
-            const ts = new Date(dateStr).getTime();
+            const dateStr = dateMatch[1].replace(/-/g, '/')
+            const ts = new Date(dateStr).getTime()
             if (!isNaN(ts)) {
-                expire = Math.floor(ts / 1000); // Sub-Store expects seconds? header usually standard unix ts (seconds)
+                expire = Math.floor(ts / 1000)
             }
         }
-    });
+    })
 
-    // Construct header string
-    // Format: upload=0; download=123; total=456; expire=789
-    const subUserInfo = `upload=0; download=${Math.floor(used)}; total=${Math.floor(total)}; expire=${expire}`;
+    // 构建 subscription-userinfo 字符串
+    const subUserInfo = `upload=${Math.floor(uploadSum)}; download=${Math.floor(downloadSum)}; total=${Math.floor(totalSum)}${expire ? `; expire=${expire}` : ''}`
 
-    // Check if running in a script environment with $options to set headers
+    // 写入 Sub-Store 存储（与 sum.js 一致）
+    if (collection) {
+        const allCols = $.read(COLLECTIONS_KEY) || []
+        for (let index = 0; index < allCols.length; index++) {
+            if (collection.name === allCols[index].name) {
+                allCols[index].subUserinfo = subUserInfo
+                break
+            }
+        }
+        $.write(allCols, COLLECTIONS_KEY)
+    }
+
+    // 设置响应头（与 sum.js 一致）
     if (typeof $options !== 'undefined') {
         $options._res = {
             headers: {
                 'subscription-userinfo': subUserInfo
             }
-        };
-    } else {
-        // Fallback or debug log
-        console.log("Calculated Header:", subUserInfo);
+        }
     }
 
-    return proxies;
+    return proxies
 }
